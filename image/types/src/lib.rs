@@ -438,8 +438,22 @@ impl ImageTocEntry {
     }
 
     pub fn overlaps(&self, other: &ImageTocEntry) -> bool {
-        self.load_addr < (other.load_addr + other.image_size())
-            && (self.load_addr + self.image_size()) > other.load_addr
+        // Check for overlap with proper overflow handling.
+        // Two ranges [a, a+size_a) and [b, b+size_b) overlap if:
+        // a < b+size_b AND a+size_a > b
+        // 
+        // However, we must handle potential integer overflow when computing
+        // a+size_a and b+size_b. If overflow would occur, we use checked_add
+        // and treat overflow as "extends to end of address space".
+        
+        let self_end = self.load_addr.checked_add(self.image_size());
+        let other_end = other.load_addr.checked_add(other.image_size());
+        
+        // If either range overflows, it extends to u32::MAX
+        let self_end = self_end.unwrap_or(u32::MAX);
+        let other_end = other_end.unwrap_or(u32::MAX);
+        
+        self.load_addr < other_end && self_end > other.load_addr
     }
 }
 
@@ -553,5 +567,34 @@ mod tests {
         image2.load_addr = 500;
         image2.size = 100;
         assert!(!image1.overlaps(&image2));
+
+        // Case 13: Test overflow protection - load_addr near u32::MAX
+        image1.load_addr = u32::MAX - 50;
+        image1.size = 100;
+        image2.load_addr = 0;
+        image2.size = 100;
+        // With saturating_add, load_addr + size = u32::MAX
+        // This should not overlap with image2 at address 0
+        assert!(!image1.overlaps(&image2));
+
+        // Case 14: Test overflow protection - adjacent regions near u32::MAX
+        image1.load_addr = u32::MAX - 100;
+        image1.size = 50;
+        image2.load_addr = u32::MAX - 49;
+        image2.size = 50;
+        // image1: [u32::MAX-100, u32::MAX-51)
+        // image2: [u32::MAX-49, overflow to u32::MAX]
+        // These should NOT overlap (there's a gap at u32::MAX-50)
+        assert!(!image1.overlaps(&image2));
+
+        // Case 15: Test actual overlap near u32::MAX
+        image1.load_addr = u32::MAX - 100;
+        image1.size = 52;  // Now reaches u32::MAX-49
+        image2.load_addr = u32::MAX - 49;
+        image2.size = 50;
+        // image1: [u32::MAX-100, u32::MAX-49)
+        // image2: [u32::MAX-49, overflow to u32::MAX]
+        // These should overlap at u32::MAX-49
+        assert!(image1.overlaps(&image2));
     }
 }
