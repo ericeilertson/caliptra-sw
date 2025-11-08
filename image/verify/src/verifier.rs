@@ -775,12 +775,15 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
             caliptra_cfi_lib::cfi_assert_eq_12_words(&verify_info.digest, &actual);
         }
 
-        // Overflow/underflow is checked in verify_toc
+        // Check that the image fits within ICCM.
+        // Note: Overflow is already checked in verify_toc, but we use checked
+        // arithmetic here for defense in depth and to be explicit.
+        let end_addr = verify_info.load_addr.checked_add(verify_info.size)
+            .and_then(|addr| addr.checked_sub(1))
+            .ok_or(CaliptraError::IMAGE_VERIFIER_ERR_FMC_LOAD_ADDR_INVALID)?;
+        
         if !self.env.iccm_range().contains(&verify_info.load_addr)
-            || !self
-                .env
-                .iccm_range()
-                .contains(&(verify_info.load_addr + verify_info.size - 1))
+            || !self.env.iccm_range().contains(&end_addr)
         {
             Err(CaliptraError::IMAGE_VERIFIER_ERR_FMC_LOAD_ADDR_INVALID)?;
         }
@@ -868,12 +871,15 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
             caliptra_cfi_lib::cfi_assert_eq_12_words(&verify_info.digest, &actual);
         }
 
-        // Overflow/underflow is checked in verify_toc
+        // Check that the image fits within ICCM.
+        // Note: Overflow is already checked in verify_toc, but we use checked
+        // arithmetic here for defense in depth and to be explicit.
+        let end_addr = verify_info.load_addr.checked_add(verify_info.size)
+            .and_then(|addr| addr.checked_sub(1))
+            .ok_or(CaliptraError::IMAGE_VERIFIER_ERR_RUNTIME_LOAD_ADDR_INVALID)?;
+        
         if !self.env.iccm_range().contains(&verify_info.load_addr)
-            || !self
-                .env
-                .iccm_range()
-                .contains(&(verify_info.load_addr + verify_info.size - 1))
+            || !self.env.iccm_range().contains(&end_addr)
         {
             Err(CaliptraError::IMAGE_VERIFIER_ERR_RUNTIME_LOAD_ADDR_INVALID)?;
         }
