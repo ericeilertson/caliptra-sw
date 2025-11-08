@@ -790,6 +790,10 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
         if verify_info.load_addr % 4 != 0 {
             Err(CaliptraError::IMAGE_VERIFIER_ERR_FMC_LOAD_ADDR_UNALIGNED)?;
         }
+        // Ensure size is word-aligned since we load in 4-byte chunks
+        if verify_info.size % 4 != 0 {
+            Err(CaliptraError::IMAGE_VERIFIER_ERR_FMC_LOAD_ADDR_UNALIGNED)?;
+        }
 
         if !self.env.iccm_range().contains(&verify_info.entry_point) {
             Err(CaliptraError::IMAGE_VERIFIER_ERR_FMC_ENTRY_POINT_INVALID)?;
@@ -884,6 +888,10 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
             Err(CaliptraError::IMAGE_VERIFIER_ERR_RUNTIME_LOAD_ADDR_INVALID)?;
         }
         if verify_info.load_addr % 4 != 0 {
+            Err(CaliptraError::IMAGE_VERIFIER_ERR_RUNTIME_LOAD_ADDR_UNALIGNED)?;
+        }
+        // Ensure size is word-aligned since we load in 4-byte chunks
+        if verify_info.size % 4 != 0 {
             Err(CaliptraError::IMAGE_VERIFIER_ERR_RUNTIME_LOAD_ADDR_UNALIGNED)?;
         }
         if !self.env.iccm_range().contains(&verify_info.entry_point) {
