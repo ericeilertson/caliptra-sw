@@ -15,7 +15,7 @@ Abstract:
 use core::cmp::{self, min};
 use core::mem::size_of;
 
-use crate::{dpe_crypto::DpeCrypto, CptraDpeTypes, DpePlatform, Drivers, StashMeasurementCmd};
+use crate::{dpe_crypto::DpeCrypto, CptraDpeTypes, DpePlatform, Drivers, PauserPrivileges, StashMeasurementCmd};
 use caliptra_auth_man_types::{
     AuthManifestImageMetadata, AuthManifestImageMetadataCollection, AuthManifestPreamble,
     ImageMetadataFlags, AUTH_MANIFEST_MARKER,
@@ -54,6 +54,14 @@ impl AuthorizeAndStashCmd {
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     #[inline(never)]
     pub(crate) fn execute(drivers: &mut Drivers, cmd_args: &[u8]) -> CaliptraResult<MailboxResp> {
+        // Only PL0 can authorize and stash measurements
+        match drivers.caller_privilege_level() {
+            PauserPrivileges::PL0 => (),
+            PauserPrivileges::PL1 => {
+                return Err(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL);
+            }
+        }
+
         if let Ok(cmd) = AuthorizeAndStashReq::ref_from_bytes(cmd_args) {
             if ImageHashSource::from(cmd.source) != ImageHashSource::InRequest {
                 Err(CaliptraError::RUNTIME_AUTH_AND_STASH_UNSUPPORTED_IMAGE_SOURCE)?;

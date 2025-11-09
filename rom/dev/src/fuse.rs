@@ -47,10 +47,16 @@ pub fn log_fuse_data(
     };
     data_dest.copy_from_slice(data);
 
-    // Compiler will optimize out the bounds check because the largest
-    // FuseLogEntryId is well within the bounds of the array. (double-checked
-    // via panic_is_possible)
-    log[entry_id as usize - 1] = log_entry;
+    // Use checked_sub to prevent underflow, then validate bounds
+    let index = (entry_id as usize)
+        .checked_sub(1)
+        .ok_or(CaliptraError::ROM_GLOBAL_FUSE_LOG_INVALID_ENTRY_ID)?;
+
+    if index >= log.len() {
+        return Err(CaliptraError::ROM_GLOBAL_FUSE_LOG_INVALID_ENTRY_ID);
+    }
+
+    log[index] = log_entry;
 
     Ok(())
 }

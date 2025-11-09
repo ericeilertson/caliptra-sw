@@ -438,8 +438,10 @@ impl ImageTocEntry {
     }
 
     pub fn overlaps(&self, other: &ImageTocEntry) -> bool {
-        self.load_addr < (other.load_addr + other.image_size())
-            && (self.load_addr + self.image_size()) > other.load_addr
+        // Use saturating_add to prevent integer overflow
+        let self_end = self.load_addr.saturating_add(self.image_size());
+        let other_end = other.load_addr.saturating_add(other.image_size());
+        self.load_addr < other_end && self_end > other.load_addr
     }
 }
 
