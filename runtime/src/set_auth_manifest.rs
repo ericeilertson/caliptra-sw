@@ -16,7 +16,7 @@ use core::cmp::min;
 use core::mem::size_of;
 
 use crate::verify;
-use crate::{dpe_crypto::DpeCrypto, CptraDpeTypes, DpePlatform, Drivers};
+use crate::{dpe_crypto::DpeCrypto, CptraDpeTypes, DpePlatform, Drivers, PauserPrivileges};
 use caliptra_auth_man_types::{
     AuthManifestFlags, AuthManifestImageMetadata, AuthManifestImageMetadataCollection,
     AuthManifestPreamble, AUTH_MANIFEST_IMAGE_METADATA_MAX_COUNT, AUTH_MANIFEST_MARKER,
@@ -460,6 +460,14 @@ impl SetAuthManifestCmd {
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     #[inline(never)]
     pub(crate) fn execute(drivers: &mut Drivers, cmd_args: &[u8]) -> CaliptraResult<MailboxResp> {
+        // Only PL0 can set the authorization manifest
+        match drivers.caller_privilege_level() {
+            PauserPrivileges::PL0 => (),
+            PauserPrivileges::PL1 => {
+                return Err(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL);
+            }
+        }
+
         // Validate cmd length
         let manifest_size: usize = {
             let err = CaliptraError::RUNTIME_MAILBOX_INVALID_PARAMS;
